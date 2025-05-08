@@ -63,6 +63,7 @@ echo "Login at http://localhost:8000";
 
 ## Roadmap
 
+- [ ] Add Homepage to combine links to each service.
 - [ ] Add Gotenberg.
 - [ ] Add Apache Tika.
 - [ ] Add Docling.
