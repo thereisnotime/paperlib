@@ -78,7 +78,8 @@ services:
       # Option 1: Standard OpenAI
       LLM_PROVIDER: "openai"
       LLM_MODEL: "gpt-4o"
-      
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
       
       # Option 2: Mistral
       # LLM_PROVIDER: "mistral"
@@ -104,9 +105,9 @@ services:
       # OCR Configuration - Choose one:
       # Option 1: LLM-based OCR
       OCR_PROVIDER: "llm" # Default OCR provider
-      VISION_LLM_PROVIDER: "ollama" # openai or ollama
-      VISION_LLM_MODEL: "minicpm-v" # minicpm-v (ollama) or gpt-4o (openai)
-      OLLAMA_HOST: "http://host.docker.internal:11434" # If using Ollama
+      VISION_LLM_PROVIDER: "openai" # openai or ollama
+      VISION_LLM_MODEL: "gpt-4o" # minicpm-v (ollama) or gpt-4o (openai)
+      # OLLAMA_HOST: "http://host.docker.internal:11434" # If using Ollama
 
       # Option 2: Google Document AI
       # OCR_PROVIDER: 'google_docai'       # Use Google Document AI
@@ -129,7 +130,7 @@ services:
       LOCAL_HOCR_PATH: "/app/hocr" # Optional, path for hOCR files
       CREATE_LOCAL_PDF: "false" # Optional, save enhanced PDFs locally
       LOCAL_PDF_PATH: "/app/pdf" # Optional, path for PDF files
-      PDF_UPLOAD: "false" # Optional, upload enhanced PDFs to paperless-ngx
+      PDF_UPLOAD: "true" # Optional, upload enhanced PDFs to paperless-ngx
       PDF_REPLACE: "false" # Optional and DANGEROUS, delete original after upload
       PDF_COPY_METADATA: "true" # Optional, copy metadata from original document
       PDF_OCR_TAGGING: "true" # Optional, add tag to processed documents

@@ -66,3 +66,4 @@ echo "Login at http://localhost:8000";
 - [ ] Add Gotenberg.
 - [ ] Add Apache Tika.
 - [ ] Add Docling.
+- [ ] Add snippets to generate token and place it in the variables where needed.
