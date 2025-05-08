@@ -1,5 +1,10 @@
 # Secrets
 .env
+.notes
+
+# Data
+export
+consume
 
 # IDEs
 .idea

@@ -2,14 +2,9 @@ services:
   paperless-ai:
     image: clusterzx/paperless-ai:2.7.6
     container_name: paperless-ai
-    network_mode: bridge
     restart: unless-stopped
     depends_on:
-      - papaerless-ngx
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges=true
+      - paperless-ngx
     env_file:
       - .env
     environment:
@@ -19,49 +14,50 @@ services:
     ports:
       - "3000:${PAPERLESS_AI_PORT:-3000}"
     volumes:
-      - paperless-ai_data:/app/data
+      - paperless-ai-data:/app/data
 
-  papaerless-ngx:
-    image: paperlessngx/paperless-ngx:2.15
+  paperless-ngx:
+    image: ghcr.io/paperless-ngx/paperless-ngx:2.15.3
     container_name: paperless-ngx
     restart: unless-stopped
     depends_on:
       - db
       - redis
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges=true
     env_file:
       - .env
     environment:
       - PAPERLESS_REDIS=redis://redis:6379
       - PAPERLESS_DBHOST=db
-      - USERMAP_UID=${USERMAP_UID:-1000}
-      - USERMAP_GID=${USERMAP_GID:-1000}
+      - PAPERLESS_DBNAME=${POSTGRES_DB}
+      - PAPERLESS_DBUSER=${POSTGRES_USER}
+      - PAPERLESS_DBPASSWORD=${POSTGRES_PASSWORD}
       - PAPERLESS_TIME_ZONE=${PAPERLESS_TIME_ZONE:-Etc/UTC}
       - PAPERLESS_OCR_LANGUAGE=${PAPERLESS_OCR_LANGUAGE:-eng}
       - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY}
-      - PAPERLESS_URL=${PAPERLESS_URL:-}
+      - PAPERLESS_URL=${PAPERLESS_URL}
+      - PAPERLESS_DBENGINE=${PAPERLESS_DBENGINE:-postgresql}
     volumes:
-      - ${CONSUME_FOLDER:-./consume}:/usr/src/paperless/consume
-      - ${MEDIA_FOLDER:-paperless-media}:/usr/src/paperless/media
-      - ${DATA_FOLDER:-paperless-data}:/usr/src/paperless/data
+      - paperless-media:/usr/src/paperless/media
+      - paperless-data:/usr/src/paperless/data
+      - ./export:/usr/src/paperless/export
+      - ./consume:/usr/src/paperless/consume
     ports:
       - "${PAPERLESS_PORT:-8000}:8000"
 
   db:
-    image: postgres:16
+    image: postgres:17
     container_name: paperless-db
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - POSTGRES_DB=paperless
-      - POSTGRES_USER=paperless
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-paperless}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - ${DATABASE_FOLDER:-paperless-db}:/var/lib/postgresql/data
+      - paperless-db:/var/lib/postgresql/data
+    # ports:
+    #   - "5432:5432"
     
   redis:
     image: redis:7
@@ -70,8 +66,115 @@ services:
     volumes:
       - paperless-redis:/data
 
+  paperless-gpt:
+    image: icereed/paperless-gpt:v0.18.0  # Docker Hub
+    environment:
+      PAPERLESS_BASE_URL: "http://paperless-ngx:8000"
+      # PAPERLESS_PUBLIC_URL: "http://paperless-ngx:8000" # Optional
+      MANUAL_TAG: "paperless-gpt" # Optional, default: paperless-gpt
+      AUTO_TAG: "paperless-gpt-auto" # Optional, default: paperless-gpt-auto
+      # LLM Configuration - Choose one:
+      
+      # Option 1: Standard OpenAI
+      LLM_PROVIDER: "openai"
+      LLM_MODEL: "gpt-4o"
+      
+      
+      # Option 2: Mistral
+      # LLM_PROVIDER: "mistral"
+      # LLM_MODEL: "mistral-large-latest"
+      # MISTRAL_API_KEY: "your_mistral_api_key"
+
+      # Option 3: Azure OpenAI
+      # LLM_PROVIDER: "openai"
+      # LLM_MODEL: "your-deployment-name"
+      # OPENAI_API_KEY: "your_azure_api_key"
+      # OPENAI_API_TYPE: "azure"
+      # OPENAI_BASE_URL: "https://your-resource.openai.azure.com"
+      
+      # Option 3: Ollama (Local)
+      # LLM_PROVIDER: "ollama"
+      # LLM_MODEL: "deepseek-r1:8b"
+      # OLLAMA_HOST: "http://host.docker.internal:11434"
+      # TOKEN_LIMIT: 1000 # Recommended for smaller models
+      
+      # Optional LLM Settings
+      # LLM_LANGUAGE: "English" # Optional, default: English
+
+      # OCR Configuration - Choose one:
+      # Option 1: LLM-based OCR
+      OCR_PROVIDER: "llm" # Default OCR provider
+      VISION_LLM_PROVIDER: "ollama" # openai or ollama
+      VISION_LLM_MODEL: "minicpm-v" # minicpm-v (ollama) or gpt-4o (openai)
+      OLLAMA_HOST: "http://host.docker.internal:11434" # If using Ollama
+
+      # Option 2: Google Document AI
+      # OCR_PROVIDER: 'google_docai'       # Use Google Document AI
+      # GOOGLE_PROJECT_ID: 'your-project'  # Your GCP project ID
+      # GOOGLE_LOCATION: 'us'              # Document AI region
+      # GOOGLE_PROCESSOR_ID: 'processor-id' # Your processor ID
+      # GOOGLE_APPLICATION_CREDENTIALS: '/app/credentials.json' # Path to service account key
+
+      # Option 3: Azure Document Intelligence
+      # OCR_PROVIDER: 'azure'              # Use Azure Document Intelligence
+      # AZURE_DOCAI_ENDPOINT: 'your-endpoint' # Your Azure endpoint URL
+      # AZURE_DOCAI_KEY: 'your-key'        # Your Azure API key
+      # AZURE_DOCAI_MODEL_ID: 'prebuilt-read' # Optional, defaults to prebuilt-read
+      # AZURE_DOCAI_TIMEOUT_SECONDS: '120'  # Optional, defaults to 120 seconds
+      # AZURE_DOCAI_OUTPUT_CONTENT_FORMAT: 'text' # Optional, defaults to 'text', other valid option is 'markdown'
+              # 'markdown' requires the 'prebuilt-layout' model
+
+      # Enhanced OCR Features
+      CREATE_LOCAL_HOCR: "false" # Optional, save hOCR files locally
+      LOCAL_HOCR_PATH: "/app/hocr" # Optional, path for hOCR files
+      CREATE_LOCAL_PDF: "false" # Optional, save enhanced PDFs locally
+      LOCAL_PDF_PATH: "/app/pdf" # Optional, path for PDF files
+      PDF_UPLOAD: "false" # Optional, upload enhanced PDFs to paperless-ngx
+      PDF_REPLACE: "false" # Optional and DANGEROUS, delete original after upload
+      PDF_COPY_METADATA: "true" # Optional, copy metadata from original document
+      PDF_OCR_TAGGING: "true" # Optional, add tag to processed documents
+      PDF_OCR_COMPLETE_TAG: "paperless-gpt-ocr-complete" # Optional, tag name
+
+      # Option 4: Docling Server
+      # OCR_PROVIDER: 'docling'              # Use a Docling server
+      # DOCLING_URL: 'http://your-docling-server:port' # URL of your Docling instance
+
+      AUTO_OCR_TAG: "paperless-gpt-ocr-auto" # Optional, default: paperless-gpt-ocr-auto
+      OCR_LIMIT_PAGES: "5" # Optional, default: 5. Set to 0 for no limit.
+      LOG_LEVEL: "info" # Optional: debug, warn, error
+    env_file:
+      - .env
+    volumes:
+      - ./prompts:/app/prompts # Mount the prompts directory
+      # For Google Document AI:
+      # - ${HOME}/.config/gcloud/application_default_credentials.json:/app/credentials.json
+      # For local hOCR and PDF saving:
+      # - ./hocr:/app/hocr # Only if CREATE_LOCAL_HOCR is true
+      # - ./pdf:/app/pdf # Only if CREATE_LOCAL_PDF is true
+    ports:
+      - "8080:8080"
+    depends_on:
+      - paperless-ngx
+
+  # TODO: Finish this
+  # gotenberg:
+  #   image: docker.io/gotenberg/gotenberg:8.19
+  #   restart: unless-stopped
+
+  # TODO: Finish this
+  #   # The gotenberg chromium route is used to convert .eml files. We do not
+  #   # want to allow external content like tracking pixels or even javascript.
+  #   command:
+  #     - "gotenberg"
+  #     - "--chromium-disable-javascript=true"
+  #     - "--chromium-allow-list=file:///tmp/.*"
+
+  # tika:
+  #   image: docker.io/apache/tika:latest
+  #   restart: unless-stopped
+
 volumes:
-  paperless-ai_data:
+  paperless-ai-data:
   paperless-media:
   paperless-data:
   paperless-db:
